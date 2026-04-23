@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Script Launcher</title>
+    <style>
+        :root { --bg: #f4f4f9; --card: #ffffff; --primary: #2563eb; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); padding: 20px; max-width: 700px; margin: auto; }
+        .container { background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        .btn-group { display: flex; gap: 10px; margin-top: 15px; display: none; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
+        .btn-search { background: var(--primary); color: white; width: 100%; display: block; }
+        .btn-view { background: #64748b; color: white; }
+        .btn-run { background: #10b981; color: white; }
+        #output-area { margin-top: 20px; background: #1e293b; color: #f8fafc; padding: 15px; border-radius: 8px; white-space: pre-wrap; display: none; font-family: monospace; font-size: 14px; overflow-x: auto; }
+        .status-msg { margin-top: 10px; font-weight: 500; }
+        .loading { color: #6366f1; font-style: italic; }
+        .error { color: #ef4444; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📂 Python Script Index</h2>
+    <input type="text" id="search" placeholder="Type script name (e.g. 'my_script')..." autocomplete="off">
+    <button class="btn-search" onclick="handleSearch()">Search</button>
+    
+    <div id="status" class="status-msg"></div>
+    
+    <div id="actions" class="btn-group">
+        <button class="btn-view" onclick="executeAction('view')">📄 View Code</button>
+        <button class="btn-run" onclick="executeAction('run')">🚀 Run Script</button>
+    </div>
+</div>
+
+<div id="output-area"></div>
+
+<script>
+    const searchInput = document.getElementById('search');
+    const statusDiv = document.getElementById('status');
+    const actionsDiv = document.getElementById('actions');
+    const outputArea = document.getElementById('output-area');
+    let currentPath = "";
+
+    // 1. Support Enter Key
+    searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') handleSearch();
+    });
+
+    async function handleSearch() {
+        // 2. Normalize input (strip .py if user typed it)
+        let name = searchInput.value.trim().replace(/\.py$/, "");
+        if (!name) return;
+
+        statusDiv.className = "status-msg loading";
+        statusDiv.innerText = "Searching...";
+        actionsDiv.style.display = "none";
+        outputArea.style.display = "none";
+
+        try {
+            // Using GET as per Claude's suggestion
+            const res = await fetch(`/search?name=${encodeURIComponent(name)}`);
+            if (!res.ok) throw new Error("Server error");
+            
+            const data = await res.json();
+            if (data.status === "found") {
+                currentPath = data.path;
+                statusDiv.className = "status-msg";
+                statusDiv.innerText = `✅ Found: ${currentPath}`;
+                actionsDiv.style.display = "flex";
+            } else {
+                statusDiv.className = "status-msg error";
+                statusDiv.innerText = "❌ File not found!";
+            }
+        } catch (err) {
+            statusDiv.className = "status-msg error";
+            statusDiv.innerText = "📡 Connection error. Is the server running?";
+        }
+    }
+
+    async function executeAction(mode) {
+        outputArea.style.display = "block";
+        outputArea.innerText = mode === 'run' ? "⏳ Running script..." : "⏳ Loading code...";
+        
+        try {
+            const res = await fetch(`/${mode}/${encodeURIComponent(currentPath)}`);
+            const data = await res.text();
+            outputArea.innerText = data;
+        } catch (err) {
+            outputArea.innerText = "❌ Failed to reach server.";
+        }
+    }
+</script>
+
+</body>
+</html>
